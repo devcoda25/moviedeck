@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Pause, Play, Trash2, X, DownloadCloud, ArrowDown, ArrowUp, Users, Clock, AlertTriangle, RotateCw } from 'lucide-react';
+import { Pause, Play, Trash2, X, DownloadCloud, ArrowDown, ArrowUp, Users, Clock, AlertTriangle, RotateCw, Archive, CheckCircle } from 'lucide-react';
 
 interface DownloadCardProps {
   download: Download;
@@ -26,9 +26,20 @@ function formatTime(seconds: number) {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
 
+const statusInfo: Record<Download['status'], { text: string, icon: React.ReactNode, color: string }> = {
+    downloading: { text: 'Downloading...', icon: <ArrowDown className="h-4 w-4" />, color: 'text-blue-400' },
+    zipping: { text: 'Zipping...', icon: <Archive className="h-4 w-4 animate-pulse" />, color: 'text-yellow-400' },
+    seeding: { text: 'Seeding...', icon: <ArrowUp className="h-4 w-4" />, color: 'text-green-400' },
+    completed: { text: 'Completed', icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-400' },
+    paused: { text: 'Paused', icon: <Pause className="h-4 w-4" />, color: 'text-gray-400' },
+    error: { text: 'Error', icon: <AlertTriangle className="h-4 w-4" />, color: 'text-destructive' },
+};
+
+
 export default function DownloadCard({ download, onPause, onResume, onCancel, onDelete }: DownloadCardProps) {
   const isCompleted = download.status === 'completed' || download.status === 'seeding';
   const isError = download.status === 'error';
+  const currentStatusInfo = statusInfo[download.status] || statusInfo.downloading;
 
   return (
     <Card className="flex flex-col overflow-hidden">
@@ -46,8 +57,10 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
         </div>
       </CardHeader>
       <CardContent className="flex-grow space-y-3 px-4 pb-4">
-        {isCompleted ? (
-          <div className="text-center text-green-400">Download Complete</div>
+        {download.status === 'completed' ? (
+           <div className="text-center text-green-400 flex items-center justify-center gap-2">
+             <CheckCircle className="h-5 w-5" /> Download Complete
+           </div>
         ) : isError ? (
             <div className="flex flex-col items-center justify-center text-center text-destructive">
                 <AlertTriangle className="h-8 w-8 mb-2" />
@@ -55,6 +68,10 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
             </div>
         ) : (
           <>
+            <div className="flex items-center gap-2">
+                <div className={currentStatusInfo.color}>{currentStatusInfo.icon}</div>
+                <span className={`font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</span>
+            </div>
             <Progress value={download.progress} />
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1"><ArrowDown className="h-3 w-3 text-primary" />{formatSpeed(download.speed)}</div>
@@ -66,7 +83,7 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
         )}
       </CardContent>
       <CardFooter className="grid grid-cols-2 gap-2 p-2 bg-muted/50">
-        {isCompleted ? (
+        {download.status === 'completed' ? (
           <>
             <Button variant="ghost" size="sm" asChild>
                 <a href={`https://www.youtube.com/watch?v=${download.yt_trailer_code}`} target="_blank" rel="noopener noreferrer">
@@ -88,7 +105,7 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
             </>
         ) : (
           <>
-            {download.status === 'downloading' ? (
+            {download.status === 'downloading' || download.status === 'zipping' || download.status === 'seeding' ? (
               <Button variant="ghost" size="sm" onClick={onPause}>
                 <Pause className="mr-2 h-4 w-4" /> Pause
               </Button>
