@@ -40,13 +40,28 @@ export default function DownloadsPage() {
         </h2>
         {completedDownloads.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {completedDownloads.map((movie, index) => (
-              <DownloadCard
-                key={`${movie.id}-${index}`}
-                download={{ ...movie, status: 'completed', progress: 100, torrentInfo: movie.torrents?.[0], speed: 0, peers: 0, timeRemaining: 0 }}
-                onDelete={() => deleteCompletedDownload(movie.id)}
-              />
-            ))}
+            {completedDownloads.map((movie, index) => {
+              const torrentInfo = movie.torrents?.[0];
+              const sizeInBytes = torrentInfo?.size_bytes || 0;
+
+              return (
+                <DownloadCard
+                  key={`${movie.id}-${index}`}
+                  download={{
+                    ...movie,
+                    status: 'completed',
+                    progress: 100,
+                    torrentInfo: torrentInfo,
+                    speed: 0,
+                    peers: 0,
+                    timeRemaining: 0,
+                    // The 'downloaded' property is added here
+                    downloaded: sizeInBytes,
+                  }}
+                  onDelete={() => deleteCompletedDownload(movie.id)}
+                />
+              );
+            })}
           </div>
         ) : (
           <p className="text-muted-foreground">No completed downloads yet.</p>
