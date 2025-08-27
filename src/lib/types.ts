@@ -46,6 +46,7 @@ export interface Movie {
   date_uploaded: string;
   date_uploaded_unix: number;
   cast?: CastMember[];
+  suggestions?: Movie[];
 }
 
 export interface Download extends Movie {

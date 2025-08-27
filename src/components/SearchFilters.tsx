@@ -80,7 +80,9 @@ export default function SearchFilters({
                   <SelectItem value="rating">Rating</SelectItem>
                   <SelectItem value="title">Title</SelectItem>
                   <SelectItem value="year">Year</SelectItem>
-                  <SelectItem value="seeds">Popularity</SelectItem>
+                  <SelectItem value="like_count">Likes</SelectItem>
+                  <SelectItem value="download_count">Downloads</SelectItem>
+                  <SelectItem value="date_added">Date Added</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={order} onValueChange={(v: any) => handleOrderChange(v)}>
@@ -112,8 +114,8 @@ export default function SearchFilters({
 
           <AccordionItem value="genres">
             <AccordionTrigger>Genres</AccordionTrigger>
-            <AccordionContent className="space-y-2 pt-2">
-              {allGenres.slice(0, 8).map((genre) => (
+            <AccordionContent className="space-y-2 pt-2 h-48 overflow-y-auto">
+              {allGenres.map((genre) => (
                 <div key={genre} className="flex items-center space-x-2">
                   <Checkbox
                     id={`genre-${genre}`}

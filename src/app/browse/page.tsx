@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getAllMovies } from '@/lib/data';
 import MovieCard from '@/components/MovieCard';
@@ -23,7 +23,7 @@ function MovieGrid({ movies }: { movies: Movie[] }) {
 
 function BrowsePageContent() {
   const searchParams = useSearchParams();
-  const [allMovies, setAllMovies] = useState<Movie[]>([]);
+  const [movies, setMovies] = useState<Movie[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // States for filters
@@ -35,67 +35,24 @@ function BrowsePageContent() {
 
   const query = searchParams.get('q') || '';
 
-  useState(() => {
-    getAllMovies().then(movies => {
-      setAllMovies(movies);
+  useEffect(() => {
+    setIsLoading(true);
+    const filterOptions: Record<string, any> = {
+      query_term: query,
+      genre: genres.join(','),
+      quality: quality.join(','),
+      minimum_rating: minRating,
+      sort_by: sortBy,
+      order_by: order,
+    };
+    
+    getAllMovies(filterOptions).then(movies => {
+      setMovies(movies);
       setIsLoading(false);
     });
-  });
+  }, [query, genres, quality, minRating, sortBy, order]);
 
-  const filteredAndSortedMovies = useMemo(() => {
-    let filtered = allMovies;
-
-    if (query) {
-      filtered = filtered.filter(movie =>
-        movie.title_long.toLowerCase().includes(query.toLowerCase())
-      );
-    }
-    if (genres.length > 0) {
-      filtered = filtered.filter(movie =>
-        genres.every(g => movie.genres.includes(g))
-      );
-    }
-    if (quality.length > 0) {
-      filtered = filtered.filter(movie =>
-        movie.torrents.some(t => quality.includes(t.quality))
-      );
-    }
-    if (minRating > 0) {
-      filtered = filtered.filter(movie => movie.rating >= minRating);
-    }
-
-    const sorted = [...filtered].sort((a, b) => {
-      let compareA: any;
-      let compareB: any;
-
-      switch(sortBy) {
-        case 'title':
-          compareA = a.title;
-          compareB = b.title;
-          break;
-        case 'year':
-          compareA = a.year;
-          compareB = b.year;
-          break;
-        case 'seeds':
-          compareA = a.torrents.reduce((acc, t) => acc + t.seeds, 0);
-          compareB = b.torrents.reduce((acc, t) => acc + t.seeds, 0);
-          break;
-        default: // rating
-          compareA = a.rating;
-          compareB = b.rating;
-      }
-      
-      if (order === 'asc') {
-        return compareA < compareB ? -1 : 1;
-      }
-      return compareA > compareB ? -1 : 1;
-    });
-
-    return sorted;
-  }, [allMovies, query, genres, quality, minRating, sortBy, order]);
-
-  const loadingSkeletons = Array.from({ length: 12 }).map((_, i) => (
+  const loadingSkeletons = Array.from({ length: 18 }).map((_, i) => (
     <div key={i} className="space-y-2">
       <Skeleton className="h-auto w-full aspect-[2/3]" />
       <Skeleton className="h-4 w-3/4" />
@@ -124,7 +81,7 @@ function BrowsePageContent() {
               {loadingSkeletons}
             </div>
           ) : (
-            <MovieGrid movies={filteredAndSortedMovies} />
+            <MovieGrid movies={movies} />
           )}
         </main>
       </div>
