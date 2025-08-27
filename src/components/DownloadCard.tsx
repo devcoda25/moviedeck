@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Pause, Play, Trash2, X, DownloadCloud, ArrowDown, ArrowUp, Users, Clock } from 'lucide-react';
+import { Pause, Play, Trash2, X, DownloadCloud, ArrowDown, ArrowUp, Users, Clock, AlertTriangle, RotateCw } from 'lucide-react';
 
 interface DownloadCardProps {
   download: Download;
@@ -20,7 +20,7 @@ function formatSpeed(speed: number) {
 }
 
 function formatTime(seconds: number) {
-  if (seconds === Infinity) return '∞';
+  if (seconds === Infinity || isNaN(seconds) || seconds < 0) return '∞';
   if (seconds < 60) return `${Math.floor(seconds)}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
@@ -28,7 +28,8 @@ function formatTime(seconds: number) {
 
 export default function DownloadCard({ download, onPause, onResume, onCancel, onDelete }: DownloadCardProps) {
   const isCompleted = download.status === 'completed' || download.status === 'seeding';
-  
+  const isError = download.status === 'error';
+
   return (
     <Card className="flex flex-col overflow-hidden">
       <CardHeader className="flex flex-row items-start gap-4 p-4">
@@ -47,6 +48,11 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
       <CardContent className="flex-grow space-y-3 px-4 pb-4">
         {isCompleted ? (
           <div className="text-center text-green-400">Download Complete</div>
+        ) : isError ? (
+            <div className="flex flex-col items-center justify-center text-center text-destructive">
+                <AlertTriangle className="h-8 w-8 mb-2" />
+                <p className="font-semibold">Download Failed</p>
+            </div>
         ) : (
           <>
             <Progress value={download.progress} />
@@ -71,6 +77,15 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
               <Trash2 className="mr-2 h-4 w-4" /> Delete
             </Button>
           </>
+        ) : isError ? (
+            <>
+                <Button variant="ghost" size="sm" onClick={onResume}>
+                    <RotateCw className="mr-2 h-4 w-4" /> Retry
+                </Button>
+                <Button variant="ghost" size="sm" onClick={onCancel} className="text-destructive hover:text-destructive">
+                    <X className="mr-2 h-4 w-4" /> Cancel
+                </Button>
+            </>
         ) : (
           <>
             {download.status === 'downloading' ? (

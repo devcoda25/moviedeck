@@ -69,9 +69,19 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
       const download = activeDownloads.find(d => d.id === movie.id);
       if(!download || download.status !== 'downloading') return;
 
-      const newProgress = download.progress + Math.random() * 2;
-      const speed = 1000 + Math.random() * 5000;
-      const timeRemaining = (100 - newProgress) / (speed / (torrent.size_bytes / 100000));
+      // Simulate a chance of error
+      if (Math.random() < 0.05) { // 5% chance of error
+        updateDownloadState(movie.id, { status: 'error', speed: 0 });
+        clearDownloadInterval(movie.id);
+        toast({ title: "Download Error", description: `An error occurred while downloading ${movie.title}.`, variant: 'destructive' });
+        return;
+      }
+      
+      const newProgress = download.progress + 10 + Math.random() * 15; // Faster progress
+      const speed = (2000 + Math.random() * 8000) * (newProgress / 100);
+      const remainingProgress = 100 - newProgress > 0 ? 100 - newProgress : 0;
+      const timeRemaining = remainingProgress / (speed / (torrent.size_bytes / 100000) || 1) ;
+
       
       if (newProgress >= 100) {
         updateDownloadState(movie.id, { progress: 100, speed: 0, status: 'completed', timeRemaining: 0 });
@@ -82,7 +92,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
       } else {
         updateDownloadState(movie.id, { progress: newProgress, speed, timeRemaining, peers: Math.floor(Math.random() * torrent.peers) });
       }
-    }, 1000);
+    }, 500);
 
     intervals.current.set(movie.id, intervalId);
   }, [activeDownloads, completedDownloads, toast, updateDownloadState, clearDownloadInterval]);
@@ -96,7 +106,20 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
     const download = activeDownloads.find(d => d.id === movieId);
     if (download) {
       updateDownloadState(movieId, { status: 'downloading' });
-      startDownload(download, download.torrentInfo);
+      // We need to re-initiate the "download" process for it.
+      const newDownload: Download = {
+        ...download,
+        status: 'downloading',
+      };
+
+      // Remove the old one before starting a new interval
+      setActiveDownloads(prev => prev.filter(d => d.id !== movieId));
+      
+      // Use a timeout to ensure state updates before re-adding
+      setTimeout(() => {
+        startDownload(newDownload, newDownload.torrentInfo);
+      }, 100)
+
     }
   };
   
