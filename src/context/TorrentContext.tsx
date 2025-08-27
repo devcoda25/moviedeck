@@ -3,7 +3,7 @@
 import type { Movie, Torrent, Download } from '@/lib/types';
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import WebTorrent from 'webtorrent';
+import type WebTorrent from 'webtorrent';
 
 interface TorrentContextType {
   activeDownloads: Download[];
@@ -24,13 +24,18 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
   const [completedDownloads, setCompletedDownloads] = useState<Movie[]>([]);
   const clientRef = useRef<WebTorrent.Instance | null>(null);
   const { toast } = useToast();
+  const WebTorrentRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (!clientRef.current) {
-        clientRef.current = new WebTorrent();
-      }
+        import('webtorrent').then(wt => {
+            WebTorrentRef.current = wt.default;
+            if (!clientRef.current) {
+                clientRef.current = new WebTorrentRef.current();
+            }
+        });
     }
+
     return () => {
       clientRef.current?.destroy();
       clientRef.current = null;
@@ -49,9 +54,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
   }, []);
 
   useEffect(() => {
-    if (completedDownloads.length > 0) {
-      localStorage.setItem('completedDownloads', JSON.stringify(completedDownloads));
-    }
+    localStorage.setItem('completedDownloads', JSON.stringify(completedDownloads));
   }, [completedDownloads]);
 
   const updateDownloadState = useCallback((movieId: number, updates: Partial<Download>) => {
@@ -69,8 +72,6 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
         toast({ title: "Already in Downloads", description: `${movie.title} is already in your downloads list.` });
         return;
     }
-
-    toast({ title: "Download Started", description: `Connecting to peers for ${movie.title}.` });
     
     const initialDownloadState: Download = {
         ...movie,
@@ -102,29 +103,26 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
         wtTorrent.on('done', () => {
             updateDownloadState(movie.id, { status: 'seeding', progress: 100, speed: 0 });
             toast({ title: "Download Complete!", description: `${movie.title} is now seeding.`});
+            
+            // Artificial delay to simulate zipping process
+            setTimeout(() => {
+                setActiveDownloads(prev => prev.filter(d => d.id !== movie.id));
+                setCompletedDownloads(prev => [movie, ...prev]);
 
-            wtTorrent.files[0].getBlob((err, blob) => {
-                if (err || !blob) {
-                    toast({ title: "File Error", description: `Could not get file blob for ${wtTorrent.files[0].name}.`, variant: "destructive" });
-                    return;
-                }
-
-                // Simulate zipping and then completing
-                setTimeout(() => {
-                    updateDownloadState(movie.id, { status: 'completed' });
-                    setCompletedDownloads(prev => [movie, ...prev.filter(m => m.id !== movie.id)]);
-                    setActiveDownloads(prev => prev.filter(d => d.id !== movie.id));
-
-                    const url = URL.createObjectURL(blob);
+                wtTorrent.files[0].getBlobURL((err, url) => {
+                    if (err || !url) {
+                        toast({ title: "Error creating download link", variant: 'destructive' });
+                        return;
+                    }
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `${movie.title}.torrent`; // Downloading the .torrent file as a placeholder for the zip
+                    a.download = `${movie.title.replace(/ /g, '_')}.mp4`; // Example, assumes first file is the movie
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                }, 2000); // 2 second delay to simulate zipping
-            });
+                });
+
+            }, 2000);
         });
 
         wtTorrent.on('error', (err) => {
@@ -155,10 +153,9 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
   };
 
   const resumeDownload = (movieId: number) => {
-    // Since pause is cancel, resume is not applicable.
     const downloadToResume = activeDownloads.find(d => d.id === movieId) || completedDownloads.find(c => c.id === movieId);
-    if (downloadToResume) {
-        startDownload(downloadToResume, downloadToResume.torrents[0]);
+    if (downloadToResume?.torrentInfo) {
+        startDownload(downloadToResume, downloadToResume.torrentInfo);
     } else {
         toast({ title: "Cannot Resume", description: "Please start the download again from the movie page." });
     }
