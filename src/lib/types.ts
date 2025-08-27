@@ -55,7 +55,9 @@ export type DownloadStatus =
   | 'downloading'
   | 'seeding'
   | 'completed'
-  | 'error';
+  | 'error'
+  | 'zipping'
+  | 'paused';
 
 export interface Download extends Movie {
   progress: number;

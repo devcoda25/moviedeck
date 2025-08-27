@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Pause, Play, Trash2, X, DownloadCloud, ArrowDown, ArrowUp, Users, Clock, AlertTriangle, RotateCw, Archive, CheckCircle, Hourglass } from 'lucide-react';
+import { Pause, Play, Trash2, X, DownloadCloud, ArrowDown, ArrowUp, Users, Clock, AlertTriangle, RotateCw, Archive, CheckCircle, Hourglass, FileArchive } from 'lucide-react';
 
 interface DownloadCardProps {
   download: Download;
@@ -39,6 +39,7 @@ const statusInfo: Record<DownloadStatus, { text: string, icon: React.ReactNode, 
     idle: { text: 'Idle', icon: <Hourglass className="h-4 w-4" />, color: 'text-gray-400' },
     connecting: { text: 'Connecting...', icon: <Hourglass className="h-4 w-4 animate-spin" />, color: 'text-yellow-400' },
     downloading: { text: 'Downloading...', icon: <ArrowDown className="h-4 w-4" />, color: 'text-blue-400' },
+    zipping: { text: 'Zipping files...', icon: <FileArchive className="h-4 w-4 animate-pulse" />, color: 'text-purple-400' },
     seeding: { text: 'Seeding...', icon: <ArrowUp className="h-4 w-4" />, color: 'text-green-400' },
     completed: { text: 'Completed', icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-400' },
     error: { text: 'Error', icon: <AlertTriangle className="h-4 w-4" />, color: 'text-destructive' },
@@ -119,7 +120,7 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
                 <Pause className="mr-2 h-4 w-4" /> Pause
               </Button>
             ) : (
-              <Button variant="ghost" size="sm" onClick={onResume}>
+              <Button variant="ghost" size="sm" onClick={onResume} disabled={download.status !== 'paused'}>
                 <Play className="mr-2 h-4 w-4" /> Resume
               </Button>
             )}
