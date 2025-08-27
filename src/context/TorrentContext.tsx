@@ -39,6 +39,13 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
                 clientRef.current = new WebTorrent.default();
                 setIsClientReady(true);
             }
+        }).catch(err => {
+            console.error('Failed to load WebTorrent:', err);
+            toast({
+              title: 'Error',
+              description: 'Failed to initialize torrent client.',
+              variant: 'destructive'
+            });
         });
     }
 
@@ -49,7 +56,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
         setIsClientReady(false);
       }
     };
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     try {
@@ -63,7 +70,11 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('completedDownloads', JSON.stringify(completedDownloads));
+    try {
+        localStorage.setItem('completedDownloads', JSON.stringify(completedDownloads));
+    } catch (error) {
+        console.error("Failed to save completed to localStorage", error);
+    }
   }, [completedDownloads]);
 
   const updateDownloadState = useCallback((movieId: number, updates: Partial<Download>) => {
@@ -124,6 +135,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            URL.revokeObjectURL(url);
           });
           
           setActiveDownloads(prev => prev.filter(d => d.id !== movie.id));
