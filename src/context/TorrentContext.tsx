@@ -35,11 +35,11 @@ async function downloadFileFromUrl(url: string, filename: string) {
     URL.revokeObjectURL(link.href);
   } catch (error) {
     console.error("Download failed:", error);
-    // We need to inform the user about the failure.
-    // This part will be handled by the component using this function.
+    // This will be caught by the calling function
     throw error;
   }
 }
+
 
 export const TorrentProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeDownloads, setActiveDownloads] = useState<Download[]>([]);
@@ -113,11 +113,14 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
                 newProgress += 34; // Speed up progress
                 if (newProgress >= 100) {
                     newProgress = 100;
-                    newStatus = 'seeding';
+                    newStatus = 'zipping'; // Move to zipping
                 }
+            } else if (download.status === 'zipping') {
+                newStatus = 'seeding'; // Move to seeding
             } else if (download.status === 'seeding') {
                 clearDownloadInterval(movie.id);
-                setCompletedDownloads(prevCompleted => [movie, ...prevCompleted]);
+                const completedMovie = { ...download, torrentInfo: undefined };
+                setCompletedDownloads(prevCompleted => [completedMovie, ...prevCompleted]);
                 
                 downloadFileFromUrl(torrent.url, `${movie.title.replace(/ /g, '_')}.torrent`)
                   .then(() => {
@@ -125,10 +128,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
                   })
                   .catch(() => {
                     toast({ title: "Download Failed", description: `Could not download the .torrent file. Please try again.`, variant: 'destructive' });
-                    // Optionally set the download to an error state
-                    setActiveDownloads(currentDownloads => currentDownloads.filter(d => d.id !== movie.id));
-                    // Or set to an error state to allow retry
-                    // updateDownloadState(movie.id, { status: 'error' });
+                     updateDownloadState(movie.id, { status: 'error', progress: 0, speed: 0 });
                   });
 
                 return prev.filter(d => d.id !== movie.id);

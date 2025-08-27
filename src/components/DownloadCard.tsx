@@ -37,7 +37,7 @@ const statusInfo: Record<Download['status'], { text: string, icon: React.ReactNo
 
 
 export default function DownloadCard({ download, onPause, onResume, onCancel, onDelete }: DownloadCardProps) {
-  const isCompleted = download.status === 'completed' || download.status === 'seeding';
+  const isCompleted = download.status === 'completed';
   const isError = download.status === 'error';
   const currentStatusInfo = statusInfo[download.status] || statusInfo.downloading;
 
@@ -57,7 +57,7 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
         </div>
       </CardHeader>
       <CardContent className="flex-grow space-y-3 px-4 pb-4">
-        {download.status === 'completed' ? (
+        {isCompleted ? (
            <div className="text-center text-green-400 flex items-center justify-center gap-2">
              <CheckCircle className="h-5 w-5" /> Download Complete
            </div>
@@ -83,7 +83,7 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
         )}
       </CardContent>
       <CardFooter className="grid grid-cols-2 gap-2 p-2 bg-muted/50">
-        {download.status === 'completed' ? (
+        {isCompleted ? (
           <>
             <Button variant="ghost" size="sm" asChild>
                 <a href={`https://www.youtube.com/watch?v=${download.yt_trailer_code}`} target="_blank" rel="noopener noreferrer">
