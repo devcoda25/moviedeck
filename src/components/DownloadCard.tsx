@@ -1,10 +1,10 @@
-import type { Download } from '@/lib/types';
+import type { Download, DownloadStatus } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Pause, Play, Trash2, X, DownloadCloud, ArrowDown, ArrowUp, Users, Clock, AlertTriangle, RotateCw, Archive, CheckCircle } from 'lucide-react';
+import { Pause, Play, Trash2, X, DownloadCloud, ArrowDown, ArrowUp, Users, Clock, AlertTriangle, RotateCw, Archive, CheckCircle, Hourglass } from 'lucide-react';
 
 interface DownloadCardProps {
   download: Download;
@@ -14,9 +14,18 @@ interface DownloadCardProps {
   onDelete?: () => void;
 }
 
+function formatBytes(bytes: number, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+
 function formatSpeed(speed: number) {
-  if (speed < 1024) return `${speed.toFixed(1)} KB/s`;
-  return `${(speed / 1024).toFixed(1)} MB/s`;
+  return `${formatBytes(speed)}/s`;
 }
 
 function formatTime(seconds: number) {
@@ -26,12 +35,12 @@ function formatTime(seconds: number) {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
 
-const statusInfo: Record<Download['status'], { text: string, icon: React.ReactNode, color: string }> = {
+const statusInfo: Record<DownloadStatus, { text: string, icon: React.ReactNode, color: string }> = {
+    idle: { text: 'Idle', icon: <Hourglass className="h-4 w-4" />, color: 'text-gray-400' },
+    connecting: { text: 'Connecting...', icon: <Hourglass className="h-4 w-4 animate-spin" />, color: 'text-yellow-400' },
     downloading: { text: 'Downloading...', icon: <ArrowDown className="h-4 w-4" />, color: 'text-blue-400' },
-    zipping: { text: 'Zipping...', icon: <Archive className="h-4 w-4 animate-pulse" />, color: 'text-yellow-400' },
     seeding: { text: 'Seeding...', icon: <ArrowUp className="h-4 w-4" />, color: 'text-green-400' },
     completed: { text: 'Completed', icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-400' },
-    paused: { text: 'Paused', icon: <Pause className="h-4 w-4" />, color: 'text-gray-400' },
     error: { text: 'Error', icon: <AlertTriangle className="h-4 w-4" />, color: 'text-destructive' },
 };
 
@@ -39,7 +48,7 @@ const statusInfo: Record<Download['status'], { text: string, icon: React.ReactNo
 export default function DownloadCard({ download, onPause, onResume, onCancel, onDelete }: DownloadCardProps) {
   const isCompleted = download.status === 'completed';
   const isError = download.status === 'error';
-  const currentStatusInfo = statusInfo[download.status] || statusInfo.downloading;
+  const currentStatusInfo = statusInfo[download.status] || statusInfo.idle;
 
   return (
     <Card className="flex flex-col overflow-hidden">
@@ -77,7 +86,7 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
               <div className="flex items-center gap-1"><ArrowDown className="h-3 w-3 text-primary" />{formatSpeed(download.speed)}</div>
               <div className="flex items-center gap-1"><Users className="h-3 w-3 text-primary" />{download.peers} peers</div>
               <div className="flex items-center gap-1"><Clock className="h-3 w-3 text-primary" />{formatTime(download.timeRemaining)} left</div>
-              <div className="flex items-center gap-1">{download.progress.toFixed(1)}%</div>
+              <div className="flex items-center gap-1">{formatBytes(download.downloaded || 0)} / {download.torrentInfo.size}</div>
             </div>
           </>
         )}
@@ -105,7 +114,7 @@ export default function DownloadCard({ download, onPause, onResume, onCancel, on
             </>
         ) : (
           <>
-            {download.status === 'downloading' || download.status === 'zipping' || download.status === 'seeding' ? (
+            {download.status === 'downloading' ? (
               <Button variant="ghost" size="sm" onClick={onPause}>
                 <Pause className="mr-2 h-4 w-4" /> Pause
               </Button>

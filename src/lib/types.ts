@@ -49,11 +49,20 @@ export interface Movie {
   suggestions?: Movie[];
 }
 
+export type DownloadStatus =
+  | 'idle'
+  | 'connecting'
+  | 'downloading'
+  | 'seeding'
+  | 'completed'
+  | 'error';
+
 export interface Download extends Movie {
   progress: number;
-  speed: number; 
+  speed: number;
   peers: number;
-  timeRemaining: number; 
-  status: 'downloading' | 'paused' | 'completed' | 'error' | 'seeding';
+  timeRemaining: number;
+  status: DownloadStatus;
   torrentInfo: Torrent;
+  downloaded: number;
 }

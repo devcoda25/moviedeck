@@ -3,6 +3,7 @@
 import type { Movie, Torrent, Download } from '@/lib/types';
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from "@/hooks/use-toast";
+import WebTorrent from 'webtorrent';
 
 interface TorrentContextType {
   activeDownloads: Download[];
@@ -18,34 +19,23 @@ interface TorrentContextType {
 
 export const TorrentContext = createContext<TorrentContextType | undefined>(undefined);
 
-// Helper to trigger a file download in the browser from a URL
-async function downloadFileFromUrl(url: string, filename: string) {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch torrent file: ${response.statusText}`);
-    }
-    const blob = await response.blob();
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-  } catch (error) {
-    console.error("Download failed:", error);
-    // This will be caught by the calling function
-    throw error;
-  }
-}
-
-
 export const TorrentProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeDownloads, setActiveDownloads] = useState<Download[]>([]);
   const [completedDownloads, setCompletedDownloads] = useState<Movie[]>([]);
-  const intervals = useRef<Map<number, NodeJS.Timeout>>(new Map());
+  const clientRef = useRef<WebTorrent.Instance | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (!clientRef.current) {
+        clientRef.current = new WebTorrent();
+      }
+    }
+    return () => {
+      clientRef.current?.destroy();
+      clientRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -58,112 +48,120 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
     }
   }, []);
 
-  const clearDownloadInterval = useCallback((movieId: number) => {
-    if (intervals.current.has(movieId)) {
-      clearInterval(intervals.current.get(movieId)!);
-      intervals.current.delete(movieId);
+  useEffect(() => {
+    if (completedDownloads.length > 0) {
+      localStorage.setItem('completedDownloads', JSON.stringify(completedDownloads));
     }
-  }, []);
+  }, [completedDownloads]);
 
   const updateDownloadState = useCallback((movieId: number, updates: Partial<Download>) => {
-    setActiveDownloads(prev => prev.map(d => d.id === movieId ? { ...d, ...updates } : d));
+    setActiveDownloads(prev => 
+        prev.map(d => d.id === movieId ? { ...d, ...updates } : d)
+    );
   }, []);
-  
+
   const startDownload = useCallback((movie: Movie, torrent: Torrent) => {
+    if (!clientRef.current) {
+        toast({ title: "Torrent client not ready", description: "Please wait a moment and try again.", variant: "destructive" });
+        return;
+    }
     if (activeDownloads.some(d => d.id === movie.id) || completedDownloads.some(c => c.id === movie.id)) {
-      const existingDownload = activeDownloads.find(d => d.id === movie.id);
-      if (!existingDownload || existingDownload.status !== 'error') {
         toast({ title: "Already in Downloads", description: `${movie.title} is already in your downloads list.` });
         return;
-      }
     }
-  
-    toast({ title: "Download Started", description: `Preparing download for ${movie.title}.` });
-  
-    const newDownload: Download = {
-      ...movie,
-      progress: 0,
-      speed: 0,
-      peers: Math.floor(Math.random() * torrent.peers),
-      timeRemaining: Infinity,
-      status: 'downloading',
-      torrentInfo: torrent,
+
+    toast({ title: "Download Started", description: `Connecting to peers for ${movie.title}.` });
+    
+    const initialDownloadState: Download = {
+        ...movie,
+        progress: 0,
+        speed: 0,
+        peers: 0,
+        timeRemaining: Infinity,
+        status: 'connecting',
+        torrentInfo: torrent,
+        downloaded: 0
     };
-  
-    setActiveDownloads(prev => {
-        const existingIndex = prev.findIndex(d => d.id === movie.id);
-        if (existingIndex > -1) {
-            return prev.map((d, i) => i === existingIndex ? newDownload : d);
-        }
-        return [...prev, newDownload];
-    });
+    setActiveDownloads(prev => [...prev, initialDownloadState]);
 
-    const intervalId = setInterval(() => {
-        setActiveDownloads(prev => {
-            const download = prev.find(d => d.id === movie.id);
-            if (!download || download.status === 'paused' || download.status === 'error') {
-                clearDownloadInterval(movie.id);
-                return prev;
-            }
+    const magnetURI = `magnet:?xt=urn:btih:${torrent.hash}&dn=${encodeURIComponent(movie.title)}&tr=udp://open.demonii.com:1337/announce&tr=udp://tracker.openbittorrent.com:80&tr=udp://tracker.coppersurfer.tk:6969&tr=udp://glotorrents.pw:6969/announce&tr=udp://tracker.opentrackr.org:1337/announce`;
 
-            let newProgress = download.progress;
-            let newStatus = download.status;
+    clientRef.current.add(magnetURI, (wtTorrent) => {
+        updateDownloadState(movie.id, { status: 'downloading', peers: wtTorrent.numPeers });
 
-            if (download.status === 'downloading') {
-                newProgress += 34; // Speed up progress
-                if (newProgress >= 100) {
-                    newProgress = 100;
-                    newStatus = 'zipping'; // Move to zipping
-                }
-            } else if (download.status === 'zipping') {
-                newStatus = 'seeding'; // Move to seeding
-            } else if (download.status === 'seeding') {
-                clearDownloadInterval(movie.id);
-                const completedMovie = { ...download, torrentInfo: undefined };
-                setCompletedDownloads(prevCompleted => [completedMovie, ...prevCompleted]);
-                
-                downloadFileFromUrl(torrent.url, `${movie.title.replace(/ /g, '_')}.torrent`)
-                  .then(() => {
-                    toast({ title: "Download Complete", description: `The .torrent file for ${movie.title} has been downloaded.` });
-                  })
-                  .catch(() => {
-                    toast({ title: "Download Failed", description: `Could not download the .torrent file. Please try again.`, variant: 'destructive' });
-                     updateDownloadState(movie.id, { status: 'error', progress: 0, speed: 0 });
-                  });
-
-                return prev.filter(d => d.id !== movie.id);
-            }
-            
-            const speed = (2000 + Math.random() * 8000);
-            const remainingProgress = 100 - download.progress;
-            const timeRemaining = remainingProgress > 0 ? remainingProgress / (speed / (torrent.size_bytes / 100000) || 1) : 0;
-
-            return prev.map(d => d.id === movie.id ? { ...d, progress: newProgress, status: newStatus, speed, timeRemaining, peers: Math.floor(Math.random() * torrent.peers) } : d);
+        wtTorrent.on('download', () => {
+            updateDownloadState(movie.id, {
+                progress: wtTorrent.progress * 100,
+                speed: wtTorrent.downloadSpeed,
+                downloaded: wtTorrent.downloaded,
+                peers: wtTorrent.numPeers,
+                timeRemaining: wtTorrent.timeRemaining,
+            });
         });
-    }, 800); 
 
-    intervals.current.set(movie.id, intervalId);
-  }, [activeDownloads, completedDownloads, toast, clearDownloadInterval, updateDownloadState]);
+        wtTorrent.on('done', () => {
+            updateDownloadState(movie.id, { status: 'seeding', progress: 100, speed: 0 });
+            toast({ title: "Download Complete!", description: `${movie.title} is now seeding.`});
+
+            wtTorrent.files[0].getBlob((err, blob) => {
+                if (err || !blob) {
+                    toast({ title: "File Error", description: `Could not get file blob for ${wtTorrent.files[0].name}.`, variant: "destructive" });
+                    return;
+                }
+
+                // Simulate zipping and then completing
+                setTimeout(() => {
+                    updateDownloadState(movie.id, { status: 'completed' });
+                    setCompletedDownloads(prev => [movie, ...prev.filter(m => m.id !== movie.id)]);
+                    setActiveDownloads(prev => prev.filter(d => d.id !== movie.id));
+
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${movie.title}.torrent`; // Downloading the .torrent file as a placeholder for the zip
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 2000); // 2 second delay to simulate zipping
+            });
+        });
+
+        wtTorrent.on('error', (err) => {
+            console.error(`Torrent error for ${movie.title}:`, err);
+            updateDownloadState(movie.id, { status: 'error', speed: 0 });
+            toast({ title: "Download Error", description: `Could not download ${movie.title}.`, variant: "destructive" });
+        });
+    });
+  }, [activeDownloads, completedDownloads, toast, updateDownloadState]);
+  
+  const cancelDownload = useCallback((movieId: number) => {
+    const download = activeDownloads.find(d => d.id === movieId);
+    if (download && clientRef.current) {
+        const torrent = clientRef.current.get(download.torrentInfo.hash);
+        if (torrent) {
+            torrent.destroy();
+        }
+    }
+    setActiveDownloads(prev => prev.filter(d => d.id !== movieId));
+    toast({ title: "Download Cancelled", variant: 'destructive' });
+  }, [activeDownloads, toast]);
 
   const pauseDownload = (movieId: number) => {
-    clearDownloadInterval(movieId);
-    updateDownloadState(movieId, { status: 'paused', speed: 0 });
+    // WebTorrent doesn't have a simple pause/resume. We'll simulate by removing and re-adding.
+    // For simplicity, we'll just implement cancel for now.
+    cancelDownload(movieId);
+    toast({ title: "Download Paused", description: "Downloads are fully cancelled when paused." });
   };
 
   const resumeDownload = (movieId: number) => {
-    const download = activeDownloads.find(d => d.id === movieId);
-    if (download) {
-        clearDownloadInterval(movieId);
-        updateDownloadState(movieId, { status: 'downloading' });
-        const { torrentInfo, ...movie } = download;
-        startDownload(movie as Movie, torrentInfo);
+    // Since pause is cancel, resume is not applicable.
+    const downloadToResume = activeDownloads.find(d => d.id === movieId) || completedDownloads.find(c => c.id === movieId);
+    if (downloadToResume) {
+        startDownload(downloadToResume, downloadToResume.torrents[0]);
+    } else {
+        toast({ title: "Cannot Resume", description: "Please start the download again from the movie page." });
     }
-  };
-  
-  const cancelDownload = (movieId: number) => {
-    clearDownloadInterval(movieId);
-    setActiveDownloads(prev => prev.filter(d => d.id !== movieId));
-    toast({ title: "Download Cancelled", variant: 'destructive' });
   };
 
   const deleteCompletedDownload = (movieId: number) => {
@@ -171,17 +169,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
     toast({ title: "Download Removed" });
   };
 
-  useEffect(() => {
-    localStorage.setItem('completedDownloads', JSON.stringify(completedDownloads));
-  }, [completedDownloads]);
-  
-  useEffect(() => {
-    return () => {
-      intervals.current.forEach(id => clearInterval(id));
-    };
-  }, []);
-
-  const isDownloading = (movieId: number) => activeDownloads.some(d => d.id === movieId) || completedDownloads.some(c => c.id === movieId);
+  const isDownloading = (movieId: number) => activeDownloads.some(d => d.id === movieId);
   const getDownload = (movieId: number) => activeDownloads.find(d => d.id === movieId);
   
   const value = { activeDownloads, completedDownloads, startDownload, pauseDownload, resumeDownload, cancelDownload, deleteCompletedDownload, isDownloading, getDownload };

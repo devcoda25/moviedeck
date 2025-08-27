@@ -1,0 +1,25 @@
+diff --git a/node_modules/webtorrent-hybrid/package.json b/node_modules/webtorrent-hybrid/package.json
+index 3254581..0031802 100644
+--- a/node_modules/webtorrent-hybrid/package.json
++++ b/node_modules/webtorrent-hybrid/package.json
+@@ -29,6 +29,5 @@
+     "run-parallel": "^1.2.0",
+     "simple-get": "^4.0.1",
+     "webtorrent": "^2.1.27",
+-    "wrtc": "^0.4.7",
+     "zero-fill": "^2.2.4"
+   },
+diff --git a/node_modules/webtorrent-hybrid/server.js b/node_modules/webtorrent-hybrid/server.js
+index 92c8152..60a1682 100644
+--- a/node_modules/webtorrent-hybrid/server.js
++++ b/node_modules/webtorrent-hybrid/server.js
+@@ -3,7 +3,7 @@
+ const httpServer = require('http').createServer()
+ const { WebSocketServer } = require('ws')
+ const wss = new WebSocketServer({ server: httpServer })
+-const wrtc = require('wrtc')
++// const wrtc = require('wrtc')
+ 
+ wss.on('connection', ws => {
+   console.log('Got connection')
+
