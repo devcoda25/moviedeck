@@ -24,7 +24,7 @@ function MovieDetailPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [enhancedDescription, setEnhancedDescription] = useState<string>('');
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const { startDownload, isDownloading, getDownload } = useTorrent();
+  const { startDownload, isDownloading, getDownload, isClientReady } = useTorrent();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -154,7 +154,7 @@ function MovieDetailPageContent() {
                                 <p className="font-bold">{torrent.quality} <span className="font-normal text-muted-foreground">{torrent.type}</span></p>
                                 <p className="text-sm text-muted-foreground">{torrent.size} | Seeds: {torrent.seeds} / Peers: {torrent.peers}</p>
                             </div>
-                            <Button onClick={() => startDownload(movie, torrent)} disabled={isDownloading(movie.id)}>
+                            <Button onClick={() => startDownload(movie, torrent)} disabled={isDownloading(movie.id) || !isClientReady} title={!isClientReady ? "Torrent client is loading..." : ""}>
                               {isDownloading(movie.id) ? <CheckCircle className="mr-2 h-4 w-4"/> : <Download className="mr-2 h-4 w-4"/>}
                                 {isDownloading(movie.id) ? 'Added' : 'Download'}
                             </Button>

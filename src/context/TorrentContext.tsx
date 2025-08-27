@@ -5,9 +5,8 @@ import React, { createContext, useState, useEffect, useCallback, useRef } from '
 import { useToast } from "@/hooks/use-toast";
 
 declare global {
-  namespace WebTorrent {
-    interface Instance {}
-    interface Torrent {}
+  interface Window {
+    os: any;
   }
 }
 
@@ -21,6 +20,7 @@ interface TorrentContextType {
   deleteCompletedDownload: (movieId: number) => void;
   isDownloading: (movieId: number) => boolean;
   getDownload: (movieId: number) => Download | undefined;
+  isClientReady: boolean;
 }
 
 export const TorrentContext = createContext<TorrentContextType | undefined>(undefined);
@@ -34,6 +34,11 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !clientRef.current) {
+        // This is a browser-only polyfill
+        if (!window.os) {
+          window.os = { tmpdir: () => '/tmp' };
+        }
+
         import('webtorrent').then(WebTorrent => {
             if (!clientRef.current) {
                 clientRef.current = new WebTorrent.default();
@@ -183,7 +188,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
   const isDownloading = (movieId: number) => activeDownloads.some(d => d.id === movieId);
   const getDownload = (movieId: number) => activeDownloads.find(d => d.id === movieId);
   
-  const value = { activeDownloads, completedDownloads, startDownload, pauseDownload, resumeDownload, cancelDownload, deleteCompletedDownload, isDownloading, getDownload };
+  const value = { activeDownloads, completedDownloads, startDownload, pauseDownload, resumeDownload, cancelDownload, deleteCompletedDownload, isDownloading, getDownload, isClientReady };
 
   return <TorrentContext.Provider value={value}>{children}</TorrentContext.Provider>;
 };
