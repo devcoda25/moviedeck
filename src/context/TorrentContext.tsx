@@ -4,7 +4,6 @@ import type { Movie, Torrent, Download } from '@/lib/types';
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from "@/hooks/use-toast";
 
-// Forward-declare the WebTorrent type to avoid importing it at the top level
 declare global {
   namespace WebTorrent {
     interface Instance {}
@@ -29,6 +28,7 @@ export const TorrentContext = createContext<TorrentContextType | undefined>(unde
 export const TorrentProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeDownloads, setActiveDownloads] = useState<Download[]>([]);
   const [completedDownloads, setCompletedDownloads] = useState<Movie[]>([]);
+  const [isClientReady, setIsClientReady] = useState(false);
   const clientRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -37,6 +37,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
         import('webtorrent').then(WebTorrent => {
             if (!clientRef.current) {
                 clientRef.current = new WebTorrent.default();
+                setIsClientReady(true);
             }
         });
     }
@@ -45,6 +46,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
       if (clientRef.current) {
         clientRef.current.destroy();
         clientRef.current = null;
+        setIsClientReady(false);
       }
     };
   }, []);
@@ -71,7 +73,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
   }, []);
 
   const startDownload = useCallback((movie: Movie, torrent: Torrent) => {
-    if (!clientRef.current) {
+    if (!isClientReady || !clientRef.current) {
         toast({ title: "Torrent client not ready", description: "Please wait a moment and try again.", variant: "destructive" });
         return;
     }
@@ -111,15 +113,18 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
           updateDownloadState(movie.id, { status: 'seeding', progress: 100, speed: 0 });
           toast({ title: "Download Complete!", description: `${movie.title} is now seeding.` });
 
-          const zipFile = new Blob([`This is a placeholder for the zipped movie: ${movie.title}`], { type: 'application/zip' });
-          const url = URL.createObjectURL(zipFile);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${movie.title.replace(/ /g, '_')}.zip`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          wtTorrent.files[0].getBlobURL((err: Error | null, url: string | null) => {
+            if (err || !url) {
+                toast({ title: 'Error creating download link', description: err?.message, variant: 'destructive' });
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = wtTorrent.files[0].name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          });
           
           setActiveDownloads(prev => prev.filter(d => d.id !== movie.id));
           setCompletedDownloads(prev => {
@@ -136,7 +141,7 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
             toast({ title: "Download Error", description: `Could not download ${movie.title}.`, variant: "destructive" });
         });
     });
-  }, [activeDownloads, completedDownloads, toast, updateDownloadState]);
+  }, [activeDownloads, completedDownloads, toast, updateDownloadState, isClientReady]);
   
   const cancelDownload = useCallback((movieId: number) => {
     const download = activeDownloads.find(d => d.id === movieId);
