@@ -3,14 +3,14 @@
 import { useTorrent } from '@/hooks/useTorrent';
 import DownloadCard from '@/components/DownloadCard';
 import { DownloadCloud, CheckCircle } from 'lucide-react';
+import { Suspense } from 'react';
 
-export default function DownloadsPage() {
+// New component to handle client-side rendering
+function DownloadCards() {
   const { activeDownloads, completedDownloads, pauseDownload, resumeDownload, cancelDownload, deleteCompletedDownload } = useTorrent();
 
   return (
-    <div className="container mx-auto px-4 py-8 lg:px-8">
-      <h1 className="mb-8 text-4xl font-bold tracking-tight font-headline">Downloads</h1>
-
+    <>
       <section className="space-y-6">
         <h2 className="flex items-center gap-3 text-2xl font-bold font-headline">
           <DownloadCloud className="h-7 w-7 text-primary" />
@@ -55,7 +55,6 @@ export default function DownloadsPage() {
                     speed: 0,
                     peers: 0,
                     timeRemaining: 0,
-                    // The 'downloaded' property is added here
                     downloaded: sizeInBytes,
                   }}
                   onDelete={() => deleteCompletedDownload(movie.id)}
@@ -67,6 +66,17 @@ export default function DownloadsPage() {
           <p className="text-muted-foreground">No completed downloads yet.</p>
         )}
       </section>
+    </>
+  );
+}
+
+export default function DownloadsPage() {
+  return (
+    <div className="container mx-auto px-4 py-8 lg:px-8">
+      <h1 className="mb-8 text-4xl font-bold tracking-tight font-headline">Downloads</h1>
+      <Suspense fallback={<div>Loading downloads...</div>}>
+        <DownloadCards />
+      </Suspense>
     </div>
   );
 }
