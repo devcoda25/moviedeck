@@ -59,13 +59,18 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
   }, []);
   
   const startDownload = useCallback((movie: Movie, torrent: Torrent) => {
+    // Prevent re-downloading if already active or completed
     if (activeDownloads.some(d => d.id === movie.id) || completedDownloads.some(c => c.id === movie.id)) {
-      toast({ title: "Already Downloaded", description: `${movie.title} is already in your downloads.` });
-      return;
+      // Check if it's a retry from an error state
+      const existingDownload = activeDownloads.find(d => d.id === movie.id);
+      if (!existingDownload || existingDownload.status !== 'error') {
+        toast({ title: "Already Downloaded", description: `${movie.title} is already in your downloads.` });
+        return;
+      }
     }
-
+  
     toast({ title: "Download Started", description: `Starting download for ${movie.title}.`, variant: "default" });
-
+  
     const newDownload: Download = {
       ...movie,
       progress: 0,
@@ -75,26 +80,23 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
       status: 'downloading',
       torrentInfo: torrent,
     };
-    setActiveDownloads(prev => [...prev, newDownload]);
-    errorCounter.current.set(movie.id, 0); // Reset error counter
+  
+    setActiveDownloads(prev => {
+        // If it's a retry, update the existing entry, otherwise add it.
+        const existingIndex = prev.findIndex(d => d.id === movie.id);
+        if (existingIndex > -1) {
+            return prev.map((d, i) => i === existingIndex ? newDownload : d);
+        }
+        return [...prev, newDownload];
+    });
 
     const intervalId = setInterval(() => {
         setActiveDownloads(prev => {
             const download = prev.find(d => d.id === movie.id);
-            if (!download) {
+            if (!download || download.status === 'paused' || download.status === 'error') {
                 clearDownloadInterval(movie.id);
                 return prev;
             }
-
-            // Consistent error simulation: fail on the 3rd tick
-            const currentErrorCount = errorCounter.current.get(movie.id) || 0;
-            if (currentErrorCount >= 2) { 
-                errorCounter.current.delete(movie.id);
-                clearDownloadInterval(movie.id);
-                toast({ title: "Download Error", description: `An error occurred while downloading ${movie.title}.`, variant: 'destructive' });
-                return prev.map(d => d.id === movie.id ? { ...d, status: 'error', speed: 0 } : d);
-            }
-            errorCounter.current.set(movie.id, currentErrorCount + 1);
 
             let newProgress = download.progress;
             let newStatus = download.status;
@@ -124,22 +126,24 @@ export const TorrentProvider = ({ children }: { children: React.ReactNode }) => 
 
             return prev.map(d => d.id === movie.id ? { ...d, progress: newProgress, status: newStatus, speed, timeRemaining, peers: Math.floor(Math.random() * torrent.peers) } : d);
         });
-    }, 800); // Slower interval for more realistic step-by-step progress
+    }, 800); 
 
     intervals.current.set(movie.id, intervalId);
-  }, [activeDownloads, completedDownloads, toast, updateDownloadState, clearDownloadInterval]);
+  }, [activeDownloads, completedDownloads, toast, clearDownloadInterval]);
 
   const pauseDownload = (movieId: number) => {
-    updateDownloadState(movieId, { status: 'paused', speed: 0 });
     clearDownloadInterval(movieId);
+    updateDownloadState(movieId, { status: 'paused', speed: 0 });
   };
 
   const resumeDownload = (movieId: number) => {
     const download = activeDownloads.find(d => d.id === movieId);
     if (download) {
-      updateDownloadState(movieId, { status: 'downloading' });
-      const { torrentInfo, ...movie } = download;
-      startDownload(movie as Movie, torrentInfo);
+        clearDownloadInterval(movieId); // Ensure no duplicate intervals
+        // We set it to downloading and startDownload will pick it up
+        updateDownloadState(movieId, { status: 'downloading' });
+        const { torrentInfo, ...movie } = download;
+        startDownload(movie as Movie, torrentInfo);
     }
   };
   
