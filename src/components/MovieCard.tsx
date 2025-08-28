@@ -33,7 +33,9 @@ export default function MovieCard({ movie, className }: MovieCardProps) {
             </div>
           </div>
         </div>
-        <Badge variant="secondary" className="absolute right-2 top-2">{movie.genres[0]}</Badge>
+        {movie.genres && movie.genres.length > 0 && (
+          <Badge variant="secondary" className="absolute right-2 top-2">{movie.genres[0]}</Badge>
+        )}
       </div>
     </Link>
   );
