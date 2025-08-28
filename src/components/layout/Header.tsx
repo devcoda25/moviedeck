@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Home, ListVideo, Search, Download, Menu } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, type FormEvent, Suspense } from 'react';
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useSearchParams } from 'next/navigation';
+
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
@@ -51,7 +53,7 @@ function SearchBar() {
     );
 }
 
-export default function Header() {
+function HeaderContent() {
   const pathname = usePathname();
   
   return (
@@ -77,10 +79,8 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className='hidden lg:block'>
-            <Suspense fallback={<div className="h-10 w-64 bg-muted rounded-md" />}>
-              <SearchBar />
-            </Suspense>
+          <div className='hidden lg:block w-64'>
+             <SearchBar />
           </div>
           <div className="md:hidden">
             <Sheet>
@@ -91,11 +91,12 @@ export default function Header() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                <nav className="flex flex-col gap-4 mt-8">
-                  <div className='lg:hidden mb-4'>
-                    <Suspense fallback={<div className="h-10 w-full bg-muted rounded-md" />}>
-                        <SearchBar />
-                    </Suspense>
+                <SheetHeader className="mb-4 text-left">
+                  <SheetTitle className="text-2xl">Navigation</SheetTitle>
+                </SheetHeader>
+                <nav className="flex flex-col gap-4">
+                  <div className='lg:hidden'>
+                    <SearchBar />
                   </div>
                   {navLinks.map(({ href, label, icon: Icon }) => (
                     <SheetClose key={href} asChild>
@@ -119,4 +120,13 @@ export default function Header() {
       </div>
     </header>
   );
+}
+
+
+export default function Header() {
+  return (
+    <Suspense fallback={<div className="h-16 w-full border-b border-border/40 bg-background/95" />}>
+      <HeaderContent />
+    </Suspense>
+  )
 }
