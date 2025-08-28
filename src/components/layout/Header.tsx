@@ -4,10 +4,11 @@ import { MovieLogo } from '@/components/MovieLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Home, ListVideo, Search, Download } from 'lucide-react';
+import { Home, ListVideo, Search, Download, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, type FormEvent, Suspense } from 'react';
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
@@ -30,7 +31,7 @@ function SearchBar() {
     };
 
     return (
-        <form onSubmit={handleSearch} className="relative hidden w-64 lg:block">
+        <form onSubmit={handleSearch} className="relative w-full">
             <Input
               type="search"
               placeholder="Search movies..."
@@ -76,9 +77,44 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Suspense fallback={<div className="h-10 w-64 bg-muted rounded-md hidden lg:block" />}>
-            <SearchBar />
-          </Suspense>
+          <div className='hidden lg:block'>
+            <Suspense fallback={<div className="h-10 w-64 bg-muted rounded-md" />}>
+              <SearchBar />
+            </Suspense>
+          </div>
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <nav className="flex flex-col gap-4 mt-8">
+                  <div className='lg:hidden mb-4'>
+                    <Suspense fallback={<div className="h-10 w-full bg-muted rounded-md" />}>
+                        <SearchBar />
+                    </Suspense>
+                  </div>
+                  {navLinks.map(({ href, label, icon: Icon }) => (
+                    <SheetClose key={href} asChild>
+                      <Link
+                        href={href}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg p-3 text-lg transition-colors hover:bg-muted',
+                          pathname === href ? 'bg-muted text-primary' : 'text-foreground'
+                        )}
+                      >
+                        <Icon className="h-5 w-5" />
+                        {label}
+                      </Link>
+                    </SheetClose>
+                  ))}
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
     </header>
