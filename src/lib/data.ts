@@ -1,10 +1,15 @@
+
 import type { Movie } from './types';
 
 const API_BASE_URL = 'https://yts.mx/api/v2';
 
 async function fetchYTS(endpoint: string, params: Record<string, any> = {}) {
   const url = new URL(`${API_BASE_URL}/${endpoint}`);
-  Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+  Object.keys(params).forEach(key => {
+    if (params[key] !== '' && params[key] !== null && params[key] !== undefined) {
+      url.searchParams.append(key, params[key]);
+    }
+  });
 
   try {
     const response = await fetch(url.toString());
@@ -19,13 +24,18 @@ async function fetchYTS(endpoint: string, params: Record<string, any> = {}) {
   } catch (error) {
     console.error("Failed to fetch from YTS API:", error);
     // Return a structure that won't break the app
-    return { movies: [], movie: null };
+    return { movies: [], movie_count: 0, limit: 20, page_number: 1, movie: null };
   }
 }
 
-export async function getAllMovies(options: Record<string, any> = {}): Promise<Movie[]> {
-  const { movies } = await fetchYTS('list_movies.json', { limit: 50, ...options });
-  return movies || [];
+export async function getAllMovies(options: Record<string, any> = {}): Promise<{ movies: Movie[], movie_count: number, limit: number, page_number: number }> {
+  const data = await fetchYTS('list_movies.json', { limit: 50, ...options });
+  return {
+    movies: data.movies || [],
+    movie_count: data.movie_count || 0,
+    limit: data.limit || 50,
+    page_number: data.page_number || 1
+  };
 }
 
 export async function getMovieById(id: number): Promise<Movie | undefined> {
